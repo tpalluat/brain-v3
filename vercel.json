@@ -1,0 +1,3 @@
+git add vercel.json
+git commit -m "Fix routing for Vercel"
+git push origin main

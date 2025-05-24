@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import BrainVisualization from './components/BrainVisualization';
@@ -10,10 +10,32 @@ import GoalsPage from './pages/GoalsPage';
 import PersonalityPage from './pages/PersonalityPage';
 import ProfilePage from './pages/ProfilePage';
 import SignUpPage from './pages/SignUpPage';
+import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import OnboardingIntro from './pages/OnboardingIntro';
 import PersonalityTest from './pages/PersonalityTest';
 import { useApp } from './contexts/AppContext';
 import { BrainSection } from './types';
+import { supabase } from './lib/supabase';
+
+// Protected Route Component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
 // Main App Content Component
 const AppContent: React.FC = () => {
@@ -94,16 +116,39 @@ const AppContent: React.FC = () => {
 
 // Root App Component with Provider
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/signup" replace />} />
+            <Route path="/" element={isAuthenticated ? <Navigate to="/app" replace /> : <HomePage />} />
             <Route path="/signup" element={<SignUpPage />} />
-            <Route path="/onboarding" element={<OnboardingIntro />} />
-            <Route path="/personality-test" element={<PersonalityTest />} />
-            <Route path="/app" element={<AppContent />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/onboarding" element={<ProtectedRoute><OnboardingIntro /></ProtectedRoute>} />
+            <Route path="/personality-test" element={<ProtectedRoute><PersonalityTest /></ProtectedRoute>} />
+            <Route path="/app" element={<ProtectedRoute><AppContent /></ProtectedRoute>} />
           </Routes>
         </AppProvider>
       </AuthProvider>
@@ -112,3 +157,5 @@ function App() {
 }
 
 export default App;
+
+export default App

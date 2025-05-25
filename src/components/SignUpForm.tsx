@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useUserProfile } from '../hooks/useUserProfile';
+import toast from 'react-hot-toast';
 
 export default function SignUpForm() {
   const navigate = useNavigate();
   const { createProfile } = useUserProfile();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -19,10 +20,30 @@ export default function SignUpForm() {
     password: '',
   });
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.firstName) newErrors.firstName = 'Le prénom est requis';
+    if (!formData.lastName) newErrors.lastName = 'Le nom est requis';
+    if (!formData.email) newErrors.email = "L'email est requis";
+    if (!formData.password) {
+      newErrors.password = 'Le mot de passe est requis';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
+    }
+    if (!formData.birthdate) newErrors.birthdate = 'La date de naissance est requise';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
+    
     setLoading(true);
-    setError(null);
+    const toastId = toast.loading('Création de votre compte...');
 
     try {
       // 1. Create auth user
@@ -31,8 +52,14 @@ export default function SignUpForm() {
         password: formData.password,
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('No user returned after signup');
+      if (authError) {
+        if (authError.message.includes('already registered')) {
+          throw new Error('Cet email est déjà associé à un compte');
+        }
+        throw authError;
+      }
+
+      if (!authData.user) throw new Error('Erreur lors de la création du compte');
 
       // 2. Create profile
       const { error: profileError } = await createProfile({
@@ -47,10 +74,12 @@ export default function SignUpForm() {
 
       if (profileError) throw profileError;
 
-      // 3. Navigate to onboarding
+      toast.success('Compte créé avec succès !', { id: toastId });
       navigate('/onboarding');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue';
+      toast.error(message, { id: toastId });
+      setErrors(prev => ({ ...prev, submit: message }));
     } finally {
       setLoading(false);
     }
@@ -68,9 +97,14 @@ export default function SignUpForm() {
             type="text"
             value={formData.firstName}
             onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.firstName ? 'border-red-500' : 'border-gray-600'
+            }`}
             required
           />
+          {errors.firstName && (
+            <p className="mt-1 text-sm text-red-500">{errors.firstName}</p>
+          )}
         </div>
         
         <div>
@@ -82,9 +116,14 @@ export default function SignUpForm() {
             type="text"
             value={formData.lastName}
             onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.lastName ? 'border-red-500' : 'border-gray-600'
+            }`}
             required
           />
+          {errors.lastName && (
+            <p className="mt-1 text-sm text-red-500">{errors.lastName}</p>
+          )}
         </div>
       </div>
 
@@ -138,9 +177,14 @@ export default function SignUpForm() {
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.email ? 'border-red-500' : 'border-gray-600'
+          }`}
           required
         />
+        {errors.email && (
+          <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+        )}
       </div>
 
       <div>
@@ -165,9 +209,14 @@ export default function SignUpForm() {
           type="date"
           value={formData.birthdate}
           onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.birthdate ? 'border-red-500' : 'border-gray-600'
+          }`}
           required
         />
+        {errors.birthdate && (
+          <p className="mt-1 text-sm text-red-500">{errors.birthdate}</p>
+        )}
       </div>
 
       <div>
@@ -179,15 +228,20 @@ export default function SignUpForm() {
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.password ? 'border-red-500' : 'border-gray-600'
+          }`}
           required
           minLength={6}
         />
+        {errors.password && (
+          <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+        )}
       </div>
 
-      {error && (
+      {errors.submit && (
         <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
-          {error}
+          {errors.submit}
         </div>
       )}
 
@@ -203,12 +257,19 @@ export default function SignUpForm() {
         {loading ? (
           <span className="flex items-center justify-center">
             <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
-            Chargement...
+            Création du compte...
           </span>
         ) : (
           "S'inscrire"
         )}
       </button>
+
+      <p className="text-center text-gray-400 text-sm">
+        Déjà inscrit ?{' '}
+        <Link to="/login" className="text-blue-400 hover:text-blue-300">
+          Se connecter
+        </Link>
+      </p>
     </form>
   );
 }

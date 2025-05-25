@@ -1,21 +1,35 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 export default function LoginForm() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.email) newErrors.email = "L'email est requis";
+    if (!formData.password) newErrors.password = 'Le mot de passe est requis';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
+    
     setLoading(true);
-    setError(null);
+    const toastId = toast.loading('Connexion en cours...');
 
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -30,9 +44,12 @@ export default function LoginForm() {
         throw signInError;
       }
 
+      toast.success('Connexion réussie !', { id: toastId });
       navigate('/app');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue';
+      toast.error(message, { id: toastId });
+      setErrors(prev => ({ ...prev, submit: message }));
     } finally {
       setLoading(false);
     }
@@ -49,9 +66,14 @@ export default function LoginForm() {
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.email ? 'border-red-500' : 'border-gray-600'
+          }`}
           required
         />
+        {errors.email && (
+          <p className="mt-1 text-sm text-red-500">{errors.email}</p>
+        )}
       </div>
 
       <div>
@@ -63,14 +85,19 @@ export default function LoginForm() {
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.password ? 'border-red-500' : 'border-gray-600'
+          }`}
           required
         />
+        {errors.password && (
+          <p className="mt-1 text-sm text-red-500">{errors.password}</p>
+        )}
       </div>
 
-      {error && (
+      {errors.submit && (
         <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
-          {error}
+          {errors.submit}
         </div>
       )}
 
@@ -92,6 +119,13 @@ export default function LoginForm() {
           'Se connecter'
         )}
       </button>
+
+      <p className="text-center text-gray-400 text-sm">
+        Pas encore de compte ?{' '}
+        <Link to="/signup" className="text-blue-400 hover:text-blue-300">
+          S'inscrire
+        </Link>
+      </p>
     </form>
   );
 }

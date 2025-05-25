@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import BrainVisualization from './components/BrainVisualization';
@@ -142,6 +143,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppProvider>
+          <Toaster position="top-right" />
           <Routes>
             <Route path="/" element={isAuthenticated ? <Navigate to="/app" replace /> : <HomePage />} />
             <Route path="/signup" element={<SignUpPage />} />
